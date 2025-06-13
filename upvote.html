@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vote Spammer Konfigurasi</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 24px;
+            border-radius: 12px; /* Rounded corners */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px; /* Increased max-width for more inputs */
+            width: 100%;
+            border: 1px solid #e2e8f0; /* Light border */
+        }
+        .message-box {
+            min-height: 40px; /* Ensure consistent height */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+        }
+        /* Custom button style */
+        button {
+            transition: all 0.2s ease-in-out;
+            transform: scale(1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        input[type="text"], input[type="number"] {
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, input[type="number"]:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Aplikasi Pengirim Vote</h1>
+
+        <div class="space-y-4 mb-6 text-left">
+            <div>
+                <label for="targetUrl" class="block text-gray-700 text-sm font-semibold mb-2">URL Target (contoh: https://app.shinigami.asia/chapter/d0ff2906-1889-4a73-afa8-12dfbf1d5ee6)</label>
+                <input type="text" id="targetUrl" placeholder="Masukkan URL target di sini" class="w-full">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="maxVotesInput" class="block text-gray-700 text-sm font-semibold mb-2">Jumlah Vote Maksimal</label>
+                    <input type="number" id="maxVotesInput" value="900000" min="1" class="w-full">
+                </div>
+                <div>
+                    <label for="delayInput" class="block text-gray-700 text-sm font-semibold mb-2">Penundaan (ms per vote)</label>
+                    <input type="number" id="delayInput" value="100" min="100" class="w-full">
+                </div>
+            </div>
+        </div>
+
+        <div class="text-left text-gray-600 mb-4 space-y-2">
+            <p>ID Chapter Target: <span id="chapterIdDisplay" class="font-semibold text-gray-900 break-all">N/A</span></p>
+            <p>Vote Maksimal: <span id="maxVotesDisplay" class="font-semibold text-gray-900">N/A</span></p>
+            <p>Penundaan Per Vote: <span id="delayDisplay" class="font-semibold text-gray-900">N/A</span></p>
+        </div>
+
+        <div class="flex flex-col items-center justify-center mb-6">
+            <p class="text-xl text-gray-700">Vote Terkirim:</p>
+            <span id="votesSent" class="font-bold text-5xl text-blue-600 mt-1">0</span>
+        </div>
+
+        <div class="flex flex-col items-center justify-center mb-6">
+            <p class="text-xl text-gray-700">Total Reaction0 Saat Ini:</p>
+            <span id="currentReaction" class="font-bold text-4xl text-green-600 mt-1">N/A</span>
+        </div>
+
+        <div id="messageBox" class="message-box mt-6 p-3 rounded-lg bg-gray-100 text-gray-700 border border-gray-200">
+            Status: Masukkan URL dan klik Mulai Voting.
+        </div>
+
+        <button id="startButton" class="mt-8 w-full md:w-auto px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300">
+            Mulai Voting
+        </button>
+    </div>
+
+    <script>
+        // Initialize variables for tracking votes and voting status
+        let sent = 0;
+        let isVoting = false; // Flag to prevent multiple voting sessions from starting
+        let currentChapterId = ''; // Dynamic chapter ID from user input
+        let currentMaxVotes = 0; // Dynamic max votes from user input
+        let currentDelay = 0; // Dynamic delay from user input
+
+        // Get references to UI elements
+        const targetUrlInput = document.getElementById('targetUrl');
+        const maxVotesInput = document.getElementById('maxVotesInput');
+        const delayInput = document.getElementById('delayInput');
+        const votesSentSpan = document.getElementById('votesSent');
+        const currentReactionSpan = document.getElementById('currentReaction');
+        const messageBox = document.getElementById('messageBox');
+        const startButton = document.getElementById('startButton');
+        const chapterIdDisplay = document.getElementById('chapterIdDisplay');
+        const maxVotesDisplay = document.getElementById('maxVotesDisplay');
+        const delayDisplay = document.getElementById('delayDisplay');
+
+        /**
+         * Extracts the chapter ID from a given URL.
+         * Expected format: https://app.shinigami.asia/chapter/YOUR-CHAPTER-ID
+         * @param {string} url - The full URL provided by the user.
+         * @returns {string | null} The extracted chapter ID, or null if not found.
+         */
+        function extractChapterId(url) {
+            try {
+                const urlObj = new URL(url);
+                // The pathname is like '/chapter/d0ff2906-1889-4a73-afa8-12dfbf1d5ee6'
+                const pathSegments = urlObj.pathname.split('/');
+                // Find the index of 'chapter' and take the next segment
+                const chapterIndex = pathSegments.indexOf('chapter');
+                if (chapterIndex > -1 && pathSegments.length > chapterIndex + 1) {
+                    return `chapter/${pathSegments[chapterIndex + 1]}`;
+                }
+            } catch (e) {
+                console.error("Error parsing URL:", e);
+            }
+            return null; // Return null if parsing fails or ID is not found
+        }
+
+        /**
+         * Displays messages in the message box with specific styling based on type.
+         * @param {string} msg - The message to display.
+         * @param {'info' | 'success' | 'error'} type - The type of message (determines color).
+         */
+        function displayMessage(msg, type = 'info') {
+            messageBox.textContent = `Status: ${msg}`;
+            // Reset all class colors first
+            messageBox.classList.remove('bg-gray-100', 'text-gray-700', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+            messageBox.classList.remove('border-gray-200', 'border-green-200', 'border-red-200');
+
+            // Apply specific colors based on message type
+            if (type === 'error') {
+                messageBox.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
+            } else if (type === 'success') {
+                messageBox.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
+            } else { // info
+                messageBox.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-200');
+            }
+        }
+
+        /**
+         * The core function to send a single vote.
+         * It handles the fetch request, parsing the response, updating UI, and scheduling the next vote.
+         */
+        async function spamVote() {
+            // Check if max votes have been reached or if voting has been stopped
+            if (sent >= currentMaxVotes || !isVoting) {
+                if (sent >= currentMaxVotes) {
+                    displayMessage("🎉 Semua vote berhasil terkirim!", 'success');
+                } else {
+                    displayMessage("Voting dihentikan.", 'info');
+                }
+                startButton.disabled = false; // Re-enable start button
+                isVoting = false; // Reset voting status
+                return; // Stop the voting process
+            }
+
+            // Update votesSent span immediately for visual feedback on progress
+            votesSentSpan.textContent = sent + 1;
+
+            try {
+                // Perform the POST request to the API
+                const response = await fetch("https://commento.shngm.io/api/article?lang=en", {
+                    method: "POST",
+                    headers: {
+                        "accept": "application/json", // Explicitly request JSON response
+                        "content-type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        path: currentChapterId, // Use the dynamic chapter ID
+                        type: "reaction0", // The reaction type to send
+                    }),
+                });
+
+                const text = await response.text(); // Get the raw response text
+                let data;
+
+                try {
+                    data = JSON.parse(text); // Attempt to parse the response as JSON
+                } catch (parseError) {
+                    // Handle cases where the response is not valid JSON
+                    displayMessage(`Gagal: Respon tidak valid untuk vote ${sent + 1}.`, 'error');
+                    console.warn(`❌ Error parsing response for vote ${sent + 1}:`, parseError, "Full response:", text);
+                    // Schedule next attempt even if parsing failed, but don't increment successful votes
+                    setTimeout(spamVote, currentDelay); // Use dynamic delay
+                    return;
+                }
+
+                // If JSON parsing was successful, increment the sent count
+                sent++;
+                votesSentSpan.textContent = sent; // Update UI with current sent count
+
+                // Extract the reaction0 count from the response data
+                const currentReaction0 = data?.data?.[0]?.reaction0;
+                if (currentReaction0 !== undefined) {
+                    currentReactionSpan.textContent = currentReaction0; // Update UI
+                } else {
+                    console.warn(`Struktur respons tidak terduga untuk vote ${sent}:`, data);
+                }
+
+                // Schedule the next vote after a delay, only if still voting
+                if (isVoting && sent < currentMaxVotes) {
+                    setTimeout(spamVote, currentDelay); // Use dynamic delay
+                } else if (isVoting) { // Check if it's the last successful vote in the sequence
+                     displayMessage("🎉 Semua vote berhasil terkirim!", 'success');
+                     startButton.disabled = false; // Re-enable start button
+                     isVoting = false; // Reset voting status
+                }
+
+            } catch (err) {
+                // Handle network errors (e.g., no internet, API down)
+                displayMessage(`Gagal: Error jaringan untuk vote ${sent + 1}.`, 'error');
+                console.error(`❌ Network error sending vote ${sent + 1}:`, err);
+                // Schedule a retry after a short delay on network errors
+                setTimeout(spamVote, currentDelay); // Use dynamic delay
+            }
+        }
+
+        // Add event listener to the start button
+        startButton.addEventListener('click', () => {
+            if (isVoting) { // If already voting, this acts as a stop button
+                isVoting = false;
+                displayMessage("Meminta penghentian voting...", 'info');
+                startButton.textContent = "Mulai Voting"; // Change button text back
+                return;
+            }
+
+            // --- Validation and setup before starting ---
+            const url = targetUrlInput.value.trim();
+            if (!url) {
+                displayMessage("❌ URL target tidak boleh kosong!", 'error');
+                targetUrlInput.focus();
+                return;
+            }
+
+            const extractedId = extractChapterId(url);
+            if (!extractedId) {
+                displayMessage("❌ URL tidak valid atau ID chapter tidak ditemukan! Pastikan formatnya seperti: https://app.shinigami.asia/chapter/ID_ANDA", 'error');
+                targetUrlInput.focus();
+                return;
+            }
+            currentChapterId = extractedId; // Set the global variable
+
+            const maxVotesValue = parseInt(maxVotesInput.value, 10);
+            if (isNaN(maxVotesValue) || maxVotesValue <= 0) {
+                displayMessage("❌ Jumlah vote maksimal harus angka positif!", 'error');
+                maxVotesInput.focus();
+                return;
+            }
+            currentMaxVotes = maxVotesValue; // Set the global variable
+
+            const delayValue = parseInt(delayInput.value, 10);
+            if (isNaN(delayValue) || delayValue < 100) { // Minimum delay of 100ms
+                displayMessage("❌ Penundaan harus angka positif (minimal 100ms)!", 'error');
+                delayInput.focus();
+                return;
+            }
+            currentDelay = delayValue; // Set the global variable
+
+            // Update displayed values
+            chapterIdDisplay.textContent = currentChapterId;
+            maxVotesDisplay.textContent = currentMaxVotes;
+            delayDisplay.textContent = `${currentDelay} ms`;
+
+            // --- Start Voting Process ---
+            isVoting = true;
+            startButton.disabled = true; // Disable button to prevent re-starting
+            startButton.textContent = "Menghentikan Voting..."; // Change button text to indicate stopping
+            sent = 0; // Reset vote count for a new session
+            votesSentSpan.textContent = sent;
+            currentReactionSpan.textContent = 'N/A';
+            displayMessage("Memulai proses voting...", 'info'); // Initial static message
+            spamVote(); // Begin the voting process
+        });
+
+        // Initial setup when the window loads
+        window.onload = () => {
+            // Pre-fill with example URL and new default delay
+            targetUrlInput.value = "https://app.shinigami.asia/chapter/d0ff2906-1889-4a73-afa8-12dfbf1d5ee6";
+            maxVotesInput.value = "900000";
+            delayInput.value = "100"; // Updated default delay
+
+            // Display initial values from inputs
+            const initialChapterId = extractChapterId(targetUrlInput.value);
+            chapterIdDisplay.textContent = initialChapterId || 'N/A';
+            maxVotesDisplay.textContent = maxVotesInput.value;
+            delayDisplay.textContent = `${delayInput.value} ms`;
+
+            displayMessage("Siap memulai voting. Masukkan URL, atur opsi, dan klik 'Mulai Voting'.", 'info');
+        };
+    </script>
+</body>
+</html>
