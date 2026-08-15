@@ -1,0 +1,8 @@
+.proxy-logs/
+.proxy-pids/
+wgcf-30/
+wgcf-multi/
+wgcf-profile.conf
+wgcf-wireproxy.conf
+wgcf-account.toml
+wgcf

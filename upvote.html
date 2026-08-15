@@ -75,8 +75,8 @@
 
         <div class="space-y-4 mb-6 text-left">
             <div>
-                <label for="targetUrl" class="block text-gray-700 text-sm font-semibold mb-2">URL Target (contoh: https://app.shinigami.asia/chapter/d0ff2906-1889-4a73-afa8-12dfbf1d5ee6)</label>
-                <input type="text" id="targetUrl" placeholder="Masukkan URL target di sini" class="w-full">
+                <label for="targetUrl" class="block text-gray-700 text-sm font-semibold mb-2">ID Target (contoh: a6d1020e-e71e-43ed-91a5-39c9c88de017 atau https://app.shinigami.asia/chapter/a6d1020e-e71e-43ed-91a5-39c9c88de017)</label>
+                <input type="text" id="targetUrl" placeholder="Masukkan ID target / UUID di sini" class="w-full">
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -122,6 +122,8 @@
         let currentChapterId = ''; // Dynamic chapter ID from user input
         let currentMaxVotes = 0; // Dynamic max votes from user input
         let currentDelay = 0; // Dynamic delay from user input
+        let currentBackoff = 0; // Backoff (ms) untuk rate limit 429, dikalikan 2 tiap kali masih 429
+        const MAX_BACKOFF = 60000; // Batas atas backoff (60 detik) agar tidak unbounded
 
         // Get references to UI elements
         const targetUrlInput = document.getElementById('targetUrl');
@@ -141,9 +143,13 @@
          * @param {string} url - The full URL provided by the user.
          * @returns {string | null} The extracted chapter ID, or null if not found.
          */
-        function extractChapterId(url) {
+        function extractChapterId(input) {
+            const trimmed = (input || '').trim();
+            if (!trimmed) return null;
+
+            // Jika input berupa URL lengkap, ambil segmen setelah /chapter/
             try {
-                const urlObj = new URL(url);
+                const urlObj = new URL(trimmed);
                 // The pathname is like '/chapter/d0ff2906-1889-4a73-afa8-12dfbf1d5ee6'
                 const pathSegments = urlObj.pathname.split('/');
                 // Find the index of 'chapter' and take the next segment
@@ -152,9 +158,20 @@
                     return `chapter/${pathSegments[chapterIndex + 1]}`;
                 }
             } catch (e) {
-                console.error("Error parsing URL:", e);
+                // Bukan URL lengkap, lanjut cek sebagai ID langsung
+                console.warn("Input bukan URL lengkap, mencoba sebagai ID langsung:", e);
             }
-            return null; // Return null if parsing fails or ID is not found
+
+            // Terima input berupa UUID langsung (dengan atau tanpa awalan chapter/)
+            let raw = trimmed;
+            if (raw.startsWith('chapter/')) raw = raw.slice('chapter/'.length);
+            // Pola UUID: 8-4-4-4-12 heksadesimal
+            const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+            if (uuidPattern.test(raw)) {
+                return `chapter/${raw}`; // Hasil tetap dipakai sebagai path API
+            }
+
+            return null; // Return null jika tidak cocok
         }
 
         /**
@@ -213,13 +230,35 @@
                 });
 
                 const text = await response.text(); // Get the raw response text
+
+                // Periksa status HTTP dari server (contoh: 403, 404, 500, dll)
+                if (!response.ok) {
+                    if (response.status === 429) {
+                        // Rate limit: segera berhenti. Prioritaskan header Retry-After,
+                        // kalau tidak ada pakai backoff eksponensial mulai 1 detik (dikalikan 2 tiap kali).
+                        const retryAfter = response.headers.get('Retry-After');
+                        const retryMs = retryAfter && !isNaN(parseInt(retryAfter, 10))
+                            ? parseInt(retryAfter, 10) * 1000
+                            : (currentBackoff === 0 ? 1000 : currentBackoff * 2);
+                        currentBackoff = Math.min(retryMs, MAX_BACKOFF); // Cap agar tidak unbounded
+                        displayMessage(`Rate limit (429). Berhenti ${currentBackoff / 1000} dtk lalu coba lagi...`, 'error');
+                        console.warn(`❌ HTTP 429 rate limited for vote ${sent + 1}. Waiting ${currentBackoff}ms (Retry-After: ${retryAfter})`);
+                        setTimeout(spamVote, currentBackoff); // Backoff
+                    } else {
+                        displayMessage(`Gagal: Server merespons ${response.status} ${response.statusText} untuk vote ${sent + 1}.`, 'error');
+                        console.error(`❌ HTTP ${response.status} ${response.statusText} for vote ${sent + 1}:`, text);
+                        setTimeout(spamVote, currentDelay); // Use dynamic delay
+                    }
+                    return;
+                }
+
                 let data;
 
                 try {
                     data = JSON.parse(text); // Attempt to parse the response as JSON
                 } catch (parseError) {
                     // Handle cases where the response is not valid JSON
-                    displayMessage(`Gagal: Respon tidak valid untuk vote ${sent + 1}.`, 'error');
+                    displayMessage(`Gagal: Respon bukan JSON valid untuk vote ${sent + 1}. Cek koneksi atau format respons API.`, 'error');
                     console.warn(`❌ Error parsing response for vote ${sent + 1}:`, parseError, "Full response:", text);
                     // Schedule next attempt even if parsing failed, but don't increment successful votes
                     setTimeout(spamVote, currentDelay); // Use dynamic delay
@@ -228,6 +267,7 @@
 
                 // If JSON parsing was successful, increment the sent count
                 sent++;
+                currentBackoff = 0; // Reset backoff setelah berhasil (rate limit sudah lewat)
                 votesSentSpan.textContent = sent; // Update UI with current sent count
 
                 // Extract the reaction0 count from the response data
@@ -249,7 +289,7 @@
 
             } catch (err) {
                 // Handle network errors (e.g., no internet, API down)
-                displayMessage(`Gagal: Error jaringan untuk vote ${sent + 1}.`, 'error');
+                displayMessage(`Gagal: Error jaringan untuk vote ${sent + 1}. Periksa koneksi internet Anda.`, 'error');
                 console.error(`❌ Network error sending vote ${sent + 1}:`, err);
                 // Schedule a retry after a short delay on network errors
                 setTimeout(spamVote, currentDelay); // Use dynamic delay
@@ -268,14 +308,14 @@
             // --- Validation and setup before starting ---
             const url = targetUrlInput.value.trim();
             if (!url) {
-                displayMessage("❌ URL target tidak boleh kosong!", 'error');
+                displayMessage("❌ ID target tidak boleh kosong!", 'error');
                 targetUrlInput.focus();
                 return;
             }
 
             const extractedId = extractChapterId(url);
             if (!extractedId) {
-                displayMessage("❌ URL tidak valid atau ID chapter tidak ditemukan! Pastikan formatnya seperti: https://app.shinigami.asia/chapter/ID_ANDA", 'error');
+                displayMessage("❌ ID target tidak valid! Masukkan UUID (mis. a6d1020e-e71e-43ed-91a5-39c9c88de017) atau URL lengkap chapter.", 'error');
                 targetUrlInput.focus();
                 return;
             }
