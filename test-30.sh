@@ -50,7 +50,7 @@ fi
 # --- 1. Nyalakan proxy ---
 echo ""
 echo "[1/4] Menyalakan $COUNT proxy..."
-"$PROXY_SH" start wgcf-30
+"$PROXY_SH" --skip start wgcf-30
 
 # --- 2. Tunggu handshake WG ---
 echo ""
