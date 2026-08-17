@@ -4,6 +4,7 @@ const rt = require("./runtime");
 const { ProxyAgent } = require("./tunnel");
 
 function buildLanes() {
+  rt.deadCount = 0;
   const laneCap = Math.max(Math.ceil(config.maxVotes / Math.max(rt.PROXIES.length, 1)), 1);
   rt.LANES = rt.PROXIES.map((proxy, i) => ({
     id: i + 1,

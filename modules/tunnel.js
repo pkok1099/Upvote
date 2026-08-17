@@ -96,7 +96,7 @@ function httpConnectTunnel({ proxy, targetHost, targetPort }) {
 // --- Custom Agent dengan Keep-Alive (hormati protokol & port target) ---
 class ProxyAgent extends (config.isHttps ? https.Agent : http.Agent) {
   constructor(proxy, optsAgent) {
-    super(Object.assign({ keepAlive: true, keepAliveMsecs: 15000, freeSocketTimeout: 30000 }, optsAgent));
+    super(Object.assign({ keepAlive: true, keepAliveMsecs: 1000, freeSocketTimeout: config.keepaliveIdle }, optsAgent));
     this.proxy = proxy;
   }
 

@@ -578,8 +578,55 @@ static void setup_dirs(const char *dir) {
 }
 
 static void usage(void) {
-    printf("Penggunaan: upctl {start|stop|restart|status|list|test} [folder-config] [--fast|--skip] [args...]\n");
-    printf("  test [dir] [votes] [delay] [id]\n");
+    printf(
+        "upctl — Kelola proxy WireGuard/WGCF & jalankan tes upvote\n"
+        "\n"
+        "PENGGUNAAN\n"
+        "  upctl <perintah> [folder-config] [opsi] [args...]\n"
+        "\n"
+        "PERINTAH\n"
+        "  start   [dir] [--fast|--skip]  Nyalakan semua proxy di folder (1 proses wireproxy\n"
+        "                                per file wgcf-*.conf). Ini HANYA menyalakan proxy,\n"
+        "                                belum menjalankan vote.\n"
+        "  stop    [dir]                  Matikan semua proxy (SIGTERM via PID file, fallback\n"
+        "                                cari proses). HANYA mematikan proxy.\n"
+        "  restart [dir]                  stop lalu start (jeda 1 detik) — proxy hidup lagi.\n"
+        "  status  [dir]                  Cek tiap proxy: JALAN/MATI + nomor port, dan alamat\n"
+        "                                IPv6 bila proxy menyala.\n"
+        "  list    [dir]                  Cetak daftar proxy (socks5://127.0.0.1:port) untuk\n"
+        "                                dipakai argumen --proxy-dir pada node.\n"
+        "  test    [dir] [votes] [delay] [id]\n"
+        "                                TES LENGKAP: start -> tunggu handshake WG siap ->\n"
+        "                                jalankan upvote-core.js (paralel) -> stop. Satu perintah\n"
+        "                                praktis untuk uji cepat, proxy otomatis dibersihkan.\n"
+        "\n"
+        "FOLDER CONFIG (default: wgcf-multi, yang TIDAK ada — selalu pakai folder nyata)\n"
+        "  Isi: kumpulan file wgcf-*.conf. Tiap conf punya 'BindAddress = 127.0.0.1:<port>'.\n"
+        "  Contoh tersedia: wgcf-30, wgcf-100, wgcf-p100.\n"
+        "\n"
+        "OPSI GLOBAL (boleh di mana saja, urutan bebas)\n"
+        "  --skip   Start TANPA cek IPv6/unik -> paling cepat, tanpa jaminan IP berbeda.\n"
+        "  --fast   Cek lebih ringan: lewati deteksi IP duplikat untuk proxy yg sudah jalan.\n"
+        "           (--skip otomatis mengaktifkan --fast.)\n"
+        "\n"
+        "ARGS khusus perintah 'test' (default di belakang):\n"
+        "  votes  = target jumlah vote sukses            (default 30)\n"
+        "  delay  = jeda antar vote per proxy, dalam ms  (default 100)\n"
+        "  id     = target UUID / chapter/<uuid>         (default bawaan tool)\n"
+        "\n"
+        "CONTOH\n"
+        "  upctl status wgcf-30            Lihat status 30 proxy (MATI/JALAN + IPv6)\n"
+        "  upctl start  wgcf-30 --skip     Nyalakan cepat tanpa cek IPv6\n"
+        "  upctl stop   wgcf-30            Matikan semua proxy\n"
+        "  upctl test   wgcf-30 30 100     Tes: 30 proxy, 30 vote, delay 100ms (lalu stop)\n"
+        "  upctl test   wgcf-p100 100 200  Tes dengan folder 100 proxy\n"
+        "\n"
+        "Perbedaan inti:\n"
+        "  'start/stop/status/list' hanya urus proxy (nyalakan/matikan/cek).\n"
+        "  'test' sudah mencakup start + jalanin node + stop sekaligus.\n"
+        "  Pakai 'start' bila mau proxy nyala terus (mis. untuk panggil node sendiri),\n"
+        "  pakai 'test' bila mau sekalian jalanin + berhenti otomatis.\n"
+    );
     exit(1);
 }
 
@@ -597,12 +644,14 @@ int main(int argc, char **argv) {
 
     if (argc < 2) usage();
     const char *cmd = argv[1];
+    if (strcmp(cmd, "help") == 0 || strcmp(cmd, "-h") == 0 || strcmp(cmd, "--help") == 0) usage();
 
     /* parse flags + positional */
     const char *dir = NULL, *a1 = NULL, *a2 = NULL, *a3 = NULL;
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--fast") == 0) FAST_MODE = 1;
         else if (strcmp(argv[i], "--skip") == 0) { SKIP_MODE = 1; FAST_MODE = 1; }
+        else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) usage();
         else if (!dir) dir = argv[i];
         else if (!a1) a1 = argv[i];
         else if (!a2) a2 = argv[i];

@@ -16,6 +16,12 @@ function releaseBudget() {
   rt.budget++;
 }
 
+// Tandai lane mati sekali saja & jaga counter global, agar worker lain cukup
+// cek rt.deadCount (O(1)) alih-alih memindai semua lane tiap iterasi (O(N)).
+function markLaneDead(lane) {
+  if (lane && !lane.dead) { lane.dead = true; rt.deadCount++; }
+}
+
 // --- Eksekusi Retry ---
 async function attemptWithRetries(lane, chapterPath) {
   for (let attempt = 0; attempt <= config.maxRetry; attempt++) {
@@ -36,7 +42,7 @@ async function attemptWithRetries(lane, chapterPath) {
         rt.state.invalid++;
         if (lane) {
           lane.consecutiveFails++;
-          if (lane.consecutiveFails >= config.DEAD_THRESHOLD) { lane.dead = true; lane.lastStatus = "MATI"; }
+          if (lane.consecutiveFails >= config.DEAD_THRESHOLD) { markLaneDead(lane); lane.lastStatus = "MATI"; }
           if (!lane.dead) lane.lastStatus = "INVALID";
           lane.lastStatusAt = Date.now();
         }
@@ -57,14 +63,14 @@ async function attemptWithRetries(lane, chapterPath) {
 
       if (lane) {
         lane.consecutiveFails++;
-        if (lane.consecutiveFails >= config.DEAD_THRESHOLD) { lane.dead = true; lane.lastStatus = "MATI"; }
+        if (lane.consecutiveFails >= config.DEAD_THRESHOLD) { markLaneDead(lane); lane.lastStatus = "MATI"; }
         if (!lane.dead) lane.lastStatus = "ERROR";
         lane.lastStatusAt = Date.now();
       }
     } catch (err) {
       if (lane) {
         lane.consecutiveFails++;
-        if (lane.consecutiveFails >= config.DEAD_THRESHOLD) { lane.dead = true; lane.lastStatus = "MATI"; }
+        if (lane.consecutiveFails >= config.DEAD_THRESHOLD) { markLaneDead(lane); lane.lastStatus = "MATI"; }
         if (!lane.dead) lane.lastStatus = "ERROR";
         lane.lastStatusAt = Date.now();
       }
@@ -84,10 +90,16 @@ function logSuccessRealtime(lane, reaction0) {
 
 // --- INDEPENDENT WORKER PER PROXY ---
 async function independentWorker(lane, chapterPath, lanes) {
+  // Sebar awalan handshake SOCKS5+TLS agar tidak semua proxy nembak bersamaan
+  // (hindari thundering herd saat ratusan proxy start di t=0).
+  if (config.ramp > 0 && lane && rt.LANES.length > 1) {
+    await sleep(Math.round(((lane.id - 1) / rt.LANES.length) * config.ramp));
+  }
+
   while (!rt.stopping) {
     if (lane && lane.dead) break;
     if (lane && lane.sent >= lane.cap) break;
-    if (lanes && lanes.length && lanes.every((l) => l.dead)) break;
+    if (rt.LANES.length > 0 && rt.deadCount >= rt.LANES.length) break;
     if (rt.state.started >= config.maxVotes * 3) break;
 
     if (!claimBudget()) break;

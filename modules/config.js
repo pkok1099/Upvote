@@ -43,6 +43,8 @@ function parseArgs(argv) {
     else if (a === "--resume") out.resume = true;
     else if (a === "--parallel") out.parallel = true;
     else if (a === "--ipv6") out.ipv6 = true;
+    else if (a === "--keepalive-idle") out.keepaliveIdle = parseInt(argv[++i], 10);
+    else if (a === "--ramp") out.ramp = parseInt(argv[++i], 10);
     else if (a === "--help" || a === "-h") out.help = true;
     else { out.unknown = a; }
   }
@@ -78,6 +80,8 @@ Keandalan & Performa:
   --dashboard-interval <ms> Frekuensi pembaruan dashboard tabel real-time (default: ${DEFAULT_DASHBOARD_MS}ms)
   --no-dashboard      Nonaktifkan dashboard tabel real-time (hanya baris statistik)
   --ipv6              Paksa jalur jaringan menggunakan IPv6
+  --keepalive-idle <ms> Waktu socket keep-alive idle ditahan sebelum ditutup & handshake diulang (default: 15000)
+  --ramp <ms>         Sebar awalan handshake antar proxy dalam window ini untuk hindari burst saat ratusan proxy start (default: 0 = mati)
   -h, --help          Tampilkan pesan bantuan ini
 `;
 
@@ -103,6 +107,8 @@ const DASHBOARD = opts.noDashboard !== true;
 const checkpointFile = opts.checkpoint ?? DEFAULT_CHECKPOINT;
 const PARALLEL = opts.parallel === true;
 const IPV6 = opts.ipv6 === true;
+const keepaliveIdle = Math.max(opts.keepaliveIdle ?? 15000, 1000);
+const ramp = Math.max(opts.ramp ?? 0, 0);
 
 const apiUrlObj = new URL(apiUrl);
 const apiHost = apiUrlObj.hostname;
@@ -151,6 +157,8 @@ module.exports = {
   checkpointFile,
   PARALLEL,
   IPV6,
+  keepaliveIdle,
+  ramp,
   apiHost,
   apiPath,
   isHttps,

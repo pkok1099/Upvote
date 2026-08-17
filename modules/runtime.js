@@ -5,6 +5,8 @@ const rt = {
   state: { sent: 0, failed: 0, started: 0, invalid: 0, lastReaction0: null, lastSuccessLabel: null },
   // Lane/worker aktif
   LANES: [],
+  // Jumlah lane mati (counter global, hindari O(N) scan di hot loop worker)
+  deadCount: 0,
   // Flag shutdown anggun
   stopping: false,
   // Anggaran vote global (anti-overshoot)
