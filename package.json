@@ -1,0 +1,16 @@
+{
+  "name": "upvote",
+  "version": "1.0.0",
+  "description": "Tool CLI berbasis Node.js untuk mensimulasikan vote massal pada sistem voting web komik Anda sendiri. Dirancang untuk pengujian pre-launch: memverifikasi akurasi rate limiter berbasis IP, mendeteksi tumpang tindih vote, dan mengukur throughput server di bawah beban.",
+  "main": "upvote-core.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cmd-table": "^1.6.0"
+  }
+}

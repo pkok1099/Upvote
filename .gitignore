@@ -1,8 +1,9 @@
 .proxy-logs/
 .proxy-pids/
-wgcf-30/
-wgcf-multi/
+wgcf-*/
 wgcf-profile.conf
 wgcf-wireproxy.conf
 wgcf-account.toml
 wgcf
+node_modules/
+.upvote-checkpoint.json
