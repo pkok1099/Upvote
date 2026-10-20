@@ -1,0 +1,11 @@
+.proxy-logs/
+.proxy-pids/
+wgcf-*/
+wgcf-profile.conf
+wgcf-wireproxy.conf
+wgcf-account.toml
+wgcf
+node_modules/
+.upvote-checkpoint.json
+.upvote-checkpoint.json.tmp
+pnpm-lock.yaml
